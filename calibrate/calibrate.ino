@@ -1,15 +1,25 @@
 #include "DualVNH5019MotorShield.h"
 #include "PinChangeInt.h"
 
+#define sideF A5
+#define sideB A4
+#define frontL A0
+#define frontR A2
 //505 A4 493 A5 right sensors ideal
 // 497 A0 505 A2 front sensors ideal
 DualVNH5019MotorShield md;
 int incomingByte = 0; // for incoming serial data
 bool valid = true;
-int inPinL = 11; // 3-> right   11-> left
-int inPinR = 3;
-float frontL = 0, frontR = 0, side_F =0, side_B=0, diff_F = 0, diff_S = 0, mult = 70, a0 = 0, a2= 0, a4 = 0, a5 = 0, diff_L = 0, diff_R = 0;
-int sample = 30, breakOut = 100, cb = 0;
+int inPinL = 11, inPinR = 3; // 3-> right   11-> left 
+float frontL_cm = 0, frontR_cm = 0, sideF_cm =0, sideB_cm=0;
+float diff_fl = 0, diff_fr = 0, diff_sf = 0, diff_sb = 0, diff_F = 0, diff_S = 0;
+float  frontL_raw = 0, frontR_raw= 0, sideF_raw = 0, sideB_raw = 0;
+int mult = 80,sample = 30, breakOut = 50, cb = 0;
+bool sAngleFlag = false, fAngleFlag  = false, fDistFlag = false, sDistFlag = false;
+int calibrateDel = 0;
+
+void front_fix(bool isSideFix = false);
+
 void setup()
 {
   Serial.begin(9600);
@@ -41,93 +51,203 @@ void loop()
 //  Serial.println(frontR);
 //  delay(500);
 //
-  a0 = sensorRead(sample, A0);
-  a2 = sensorRead(sample, A2);
-  a4 = sensorRead(sample, A4);
-  a5 = sensorRead(sample, A5);
-  frontL = convertToCM_A0(a0);
-  frontR = convertToCM_A2(a2);
-  side_F = convertToCM_A5(a5);
-  side_B = convertToCM_A4(a4);
-  diff_S = side_F-side_B;
-  diff_F = frontL-frontR;
-  diff_L = a0 - 497;
-  diff_R = a2 - 505;
-  
+//  frontL_raw = sensorRead(sample, frontL);
+//  frontR_raw = sensorRead(sample, frontR);
+//  sideF_raw = sensorRead(sample, sideF);
+//  sideB_raw = sensorRead(sample, sideB);
+//  frontL_cm = convertToCM_fl(frontL_raw);
+//  frontR_cm = convertToCM_fr(frontR_raw);
+//  sideF_cm = convertToCM_sf(sideF_raw);
+//  sideB_cm = convertToCM_sb(sideB_raw);
+//  diff_S = sideF_cm - sideB_cm;
+//  diff_F = frontL_cm-frontR_cm;
+//  diff_fl = frontL_raw - 497;
+//  diff_fr = frontR_raw - 505;
+//  diff_sf = sideF_raw - 493;
+//  diff_sb = sideB_raw - 505;
 //  if (abs(diff_F)>0.4 || abs(diff_L) > 50 || abs(diff_R) > 50){
 //    front_angle_fix();
 //    front_dist_fix();
 //    front_angle_fix();
 //  }
-  if (abs(diff_S)>0.4)
-    side_angle_fix();
+  front_fix();
+  md.setSpeeds(-400,400);
+  delay(2000);
+  md.setBrakes(400,400);
+  delay(5000);
+  side_fix();
+  delay(10000);
+
+
 }
   
 void side_angle_fix(){
     cb = 0;
-    while (abs(diff_S)>0.3 && cb<breakOut){
-    if (diff_S>1.5)
-        diff_S=1.5;
-
-    if(diff_S<-1.5)
-        diff_S=-1.5;
-    md.setSpeeds(diff_S*mult, -diff_S*mult);
-    Serial.println(diff_S*mult);
-    cb++;
-    delay(20);
-    side_F = convertToCM_A5(sensorRead(sample, A5));
-    side_B = convertToCM_A4(sensorRead(sample, A4));
-    diff_S = side_F-side_B;
-  }
-}
-
+    sideF_raw = sensorRead(sample, sideF);
+    sideB_raw = sensorRead(sample, sideB);
+    sideF_cm = convertToCM_sf(sideF_raw);
+    sideB_cm = convertToCM_sb(sideB_raw);
+    diff_S = sideF_cm-sideB_cm;
+    sAngleFlag = abs(diff_S)>0.3;
+    
+    while (sAngleFlag && cb<breakOut){
+      diff_S = max(-1.5,min(diff_S,1.5));
+      md.setSpeeds(diff_S*mult, -diff_S*mult);
+      
+      sideF_cm = convertToCM_sf(sensorRead(sample, sideF));
+      sideB_cm = convertToCM_sb(sensorRead(sample, sideB));
+      diff_S = sideF_cm-sideB_cm;
+      sAngleFlag = abs(diff_S)>0.2;
+      cb++;
+    }
   
-void front_angle_fix(){
-    cb = 0;
-    while (abs(diff_F)>0.4 && cb<breakOut){
-    if (diff_F>1.2)
-        diff_F=1.2;
+  md.setBrakes(400,400);
+}
 
-    if(diff_F<-1.2)
-        diff_F=-1.2;
-    md.setSpeeds(-diff_F*mult, diff_F*mult);
+
+void side_dist_fix(){
+  sideF_raw = sensorRead(sample, sideF);
+  sideB_raw = sensorRead(sample, sideB);
+  diff_sf = sideF_raw - 493;
+  diff_sb = sideB_raw - 505;
+  sDistFlag = abs(diff_sf)>40 && abs(diff_sb)>40;
+
+  cb = 0;
+  while(sDistFlag && cb<2){
+    //turn left
+    md.setSpeeds(200,-200);
+    delay(1000);
+    md.setBrakes(400,400);
+    
+    front_fix(true);
+  
+    //turn right
+    md.setSpeeds(-200,200);
+    delay(1000);
+    md.setBrakes(400,400);
+    
+    side_angle_fix();
+    delay(500);
+    //measure new
+    sideF_raw = sensorRead(sample, sideF);
+    sideB_raw = sensorRead(sample, sideB);
+    diff_sf = sideF_raw - 493;
+    diff_sb = sideB_raw - 505;
+    sDistFlag = abs(diff_sf)>30 && abs(diff_sb)>30;
     cb++;
-    delay(20);
-    side_F = convertToCM_A0(sensorRead(sample, A0));
-    frontR = convertToCM_A2(sensorRead(sample, A2));
-    diff_F = frontL-frontR;
   }
-}
+}  
 
-void side_dis_fix(){
-  front_side = sensorRed(sample,A
-  //leftTurn();
-  front_angle_fix();
-  front_dist_fix();
-  //rightTurn();
+void side_fix(){
+ int i = 0;
+ do{
+   side_angle_fix();
+   side_dist_fix();
+   i++;
+ }while( (sAngleFlag||sDistFlag) && i<2 );
+ side_angle_fix();
+ sAngleFlag = false;
+ sDistFlag = false;
 }
+void front_angle_fix(){
+   Serial.println("front_angle_fix start");
 
-void front_dist_fix(){
+  frontL_raw = sensorRead(sample, frontL);
+  frontR_raw = sensorRead(sample, frontR);
+  frontL_cm = convertToCM_fl(frontL_raw);
+  frontR_cm = convertToCM_fr(frontR_raw);
+  diff_F = frontL_cm-frontR_cm;
+  fAngleFlag = abs(diff_F)>0.3;
   
   cb = 0;
-  
-  while (abs(diff_L)>50 && abs(diff_R)>50 && cb<breakOut){
-    if(diff_L > 140)
-      diff_L=140;
-    if(diff_R > 150)
-      diff_R=140;
-    md.setSpeeds(-diff_L, -diff_R);
-    delay(20);
+  while (fAngleFlag && cb<breakOut){
+    diff_F = max(-1.5,min(diff_F,1.5));
+    md.setSpeeds(-diff_F*mult,diff_F*mult);
+    
+    frontL_cm = convertToCM_fl(sensorRead(sample, frontL));
+    frontR_cm= convertToCM_fr(sensorRead(sample, frontR));
+    
+    diff_F = frontL_cm-frontR_cm;
+    fAngleFlag = abs(diff_F)>0.2;
     cb++;
-    a0 = sensorRead(sample, A0);
-    a2 = sensorRead(sample, A2);
-    diff_L = a0 - 497;
-    diff_R = a2 - 505;
+  }
+  md.setBrakes(400,400);
+   Serial.println("front_anglet_fix done");
+
+
+
+}
+
+
+void front_dist_fix(){
+   Serial.println("front_dist_fix start");
+
+  frontL_raw = sensorRead(sample, frontL);
+  frontR_raw = sensorRead(sample, frontR);
+  diff_fl = frontL_raw - 497;
+  diff_fr = frontR_raw - 505;
+  fDistFlag = abs(diff_fl)>40 && abs(diff_fr)>40;
+  
+  cb = 0;
+  while (fDistFlag && cb<breakOut){
+    diff_fl = max(-150,min(diff_fl,150));
+    diff_fr = max(-150,min(diff_fr,150));
+    md.setSpeeds(-diff_fr*1.2, -diff_fl*1.2);
+    
+    frontL_raw = sensorRead(sample, frontL);
+    frontR_raw = sensorRead(sample, frontR);
+    diff_fl = frontL_raw - 497;
+    diff_fr = frontR_raw - 505;
+    fDistFlag = abs(diff_fl)>30 && abs(diff_fr)>30;
+    cb++;
+  }
+    md.setBrakes(400,400);
+ Serial.println("front_dist_fix done");
+}
+
+void front_fix(bool isSideFix = false){
+   
+  bool tempDist = fDistFlag;
+  bool tempAngle = fAngleFlag;
+  int i = 0;
+  
+  do{
+    front_angle_fix();
+    front_dist_fix();
+    i++;
+  }while((fAngleFlag||fDistFlag) && i<2);
+  front_angle_fix();
+  fAngleFlag = false;
+  fDistFlag = false;
+  
+  if(isSideFix){
+    fDistFlag = tempDist;
+    fAngleFlag = tempAngle;
   }
 }
-  
+// called after every movement, if any flag is set, try to calibrate in optimal conditions(at cornerrs)
+// if calibration is delayed too long, calibrate on suboptimal conditions
+// if all flags are resolved, delay is reset to 0
+void calibrate(){
+  //  LOGIC FOR CALIBRATION -> to be tested
+//  if(sAngleFlag||sDistFlag||fAngleFlag||fDistFlag){
+//    if( front distance and side distance less than 1 grid){
+//      front_fix();
+//      side_fix();
+//
+//      if(!(sAngleFlag||sDistFlag||fAngleFlag||fDistFlag)) calibrateDel = 0;
+//    }else if(calibrateDel>5){
+//      if(front distances< 1 grid)front_fix();
+//      if(sides distances< 1 grid)side_fix();
+//
+//      if(!(sAngleFlag||sDistFlag||fAngleFlag||fDistFlag)) calibrateDel = 0;
+//    }else calibrateDel++;
+//  }
 
-float convertToCM_A2(float val){
+}
+
+//A2
+float convertToCM_fr(float val){
   float dist;
   if(val>628)
     dist=1;
@@ -222,8 +342,8 @@ float convertToCM_A2(float val){
 //}
 
 
-
-float convertToCM_A0(float val){
+//A0
+float convertToCM_fl(float val){
   float dist;
   if(val>625)
     dist=1;
@@ -270,8 +390,8 @@ float convertToCM_A0(float val){
   return dist;
 }
 
-
-float convertToCM_A4(float val){
+//A4
+float convertToCM_sb(float val){
   float dist;
   if(val>631)
     dist=2;
@@ -295,8 +415,8 @@ float convertToCM_A4(float val){
     dist=10;
   return dist;
 }
-
-float convertToCM_A5(float val){
+//A5
+float convertToCM_sf(float val){
   float dist;
   if(val>627)
     dist=2;

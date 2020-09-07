@@ -69,6 +69,7 @@ void loop()
 //      valid = false;
 //    }else valid = true;
 //  }
+  stopIfFault();
 
 if (millis() > 3000)
   md.setSpeeds(250,250);

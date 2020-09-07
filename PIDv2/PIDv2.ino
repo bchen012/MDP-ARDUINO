@@ -4,18 +4,17 @@
 
 DualVNH5019MotorShield md;
 int incomingByte = 0; // for incoming serial data
-bool valid = true;
-int inPinL = 11; // 3-> right   11-> left
-int inPinR = 3;
+int inPinL = 11, inPinR = 3; // 3-> right   11-> left
 volatile unsigned long time0_R=0,time1_R=0,time0_L=0,time1_L=0;
 volatile unsigned int enCountL = 0,enCountR = 0;
 int acc_rate = 20;
 const float constant = 106714;
-const float k1_L = 0.8, k2_L = -0.15,k3_L=0;
-const float k1_R = 1, k2_R = -0.15,k3_R=0;
+ const float k1_L = 0.8, k2_L = -0.15,k3_L=0;
+ const float k1_R = 1, k2_R = -0.15,k3_R=0;
 
 //const float k1_L = 0.36, k2_L = -0.15,k3_L=0;
 //const float k1_R = 0.4, k2_R = -0.16,k3_R=0;
+//
 
 
 float error_L[] = {0,0,0}, error_R[] = {0,0,0};
@@ -25,6 +24,20 @@ float u_R = 0, rpm_R = 0;
 int turn_time = 65, startSpeed = 200;
 signed int speed_R = 0, speed_L = 0;
 //int counter_L = 0, counter_R = 0;
+
+
+
+int deg_to_tick_R(int degree){
+  return int((float)degree*335.0/72.0)-60.0;
+}
+int deg_to_tick_L(int degree){
+  return int((float)degree*169.0/36.0)-60;
+}
+
+int distance_to_ticks(int dist){
+  return int(29.429*(float)dist-33);
+}
+
 
 void Interrupt_L(void)
 {
@@ -59,16 +72,6 @@ void setup()
     
 }
 
-int deg_to_tick_R(int degree){
-  return int((float)degree*335.0/72.0)-60.0;
-}
-int deg_to_tick_L(int degree){
-  return int((float)degree*169.0/36.0)-60;
-}
-
-int distance_to_ticks(int dist){
-  return int(29.429*(float)dist-33);
-}
 
 void loop()
 {
@@ -85,14 +88,12 @@ void loop()
   //1033 ticks -> 35cm
     forward(60,distance_to_ticks(100));
     delay(3000);
-//    forward(60,distance_to_ticks(20));
-//    delay(3000);
-//    forward(60,distance_to_ticks(30));
-//    delay(3000);
-    right_turn(60, deg_to_tick_R(360));
+    forward(70,distance_to_ticks(20));
     delay(3000);
-    right_turn(60, deg_to_tick_R(180));
+    forward(80,distance_to_ticks(30));
     delay(3000);
+//    right_turn(60, deg_to_tick_R(180));
+    delay(100);
     
 
     
@@ -109,8 +110,8 @@ void forward(int setRPM, int num){
     u_R = setRPM;
     while (enCountL<num){
       set_rpm(setRPM);
-      speed_L = (u_L + 20.7)*2.778;
-      speed_R = (u_R + 22.3)*2.703;
+       speed_L = (u_L + 20.7)*2.778;
+       speed_R = (u_R + 22.3)*2.703;
       md.setSpeeds(speed_R, speed_L);
     }
 
@@ -151,10 +152,10 @@ void left_turn(int setRPM, int num){
     u_L = setRPM;
     u_R = setRPM;
     while (enCountL < num){
-    set_rpm(setRPM);
-    speed_L = (u_L + 18.3)*2.857;
-    speed_R = (u_R + 22.3)*2.703;
-    md.setSpeeds(speed_R, -speed_L);
+      set_rpm(setRPM);
+      speed_L = (u_L + 18.3)*2.857;
+      speed_R = (u_R + 22.3)*2.703;
+      md.setSpeeds(speed_R, -speed_L);
     }
     stopMotor(2, setRPM);
 }
@@ -211,7 +212,7 @@ void stopMotor(int dir, int u){
             delay(acc_rate);
             md.setSpeeds(speed_R*2, speed_L*2);   // forward
             delay(acc_rate);
-            md.setSpeeds(speed_R, speed_L);   // forward
+//            md.setSpeeds(speed_R, speed_L);   // forward
 //            delay(acc_rate);
 //            md.setSpeeds(speed_R, speed_L);   // forward
             break;
@@ -259,7 +260,7 @@ void set_rpm(float setRPM){
     index = (index+1)%3;
     error_L[index] = setRPM - rpm_L;
     error_R[index] = setRPM - rpm_R;
-    
+  
     u_R = u_R + k1_R*error_R[index]+k2_R*error_R[(index-1)%3];  //+k3_R*error_R[(index-2)%3];
     u_L = u_L + k1_L*error_L[index]+k2_L*error_L[(index-1)%3];  //+k3_L*error_L[(index-2)%3]; 
 
