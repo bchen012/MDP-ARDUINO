@@ -5,22 +5,28 @@
 
 #include "DualVNH5019MotorShield.h"
 #include "PinChangeInt.h"
-#define sideF A5
-#define sideB A4
+
 #define frontL A0
+#define frontM A1
 #define frontR A2
+#define longR A3
+#define sideB A4
+#define sideF A5
+
 //505 A4 493 A5 right sensors ideal
 // 497 A0 505 A2 front sensors ideal
 DualVNH5019MotorShield md;
+enum sense { FRONT_LEFT = 0, FRONT_MID = 1, FRONT_RIGHT = 2,LONG_RANGE = 3,SIDE_BACK = 4, SIDE_FRONT = 5};
+
 int incomingByte = 0; // for incoming serial data
 bool valid = true;
 int inPinL = 11, inPinR = 3; // 3-> right   11-> left 
-double frontL_cm = 0, frontR_cm = 0, sideF_cm =0.0, sideB_cm=0.0;
+double frontL_cm = 0, frontR_cm = 0, sideF_cm =0, sideB_cm=0;
 double diff_fl = 0, diff_fr = 0, diff_sf = 0, diff_sb = 0, diff_F = 0, diff_S = 0;
-double  frontL_raw = 0, frontR_raw= 0, sideF_raw = 0, sideB_raw = 0;
+double  frontL_raw = 0,frontM_raw = 0, frontR_raw= 0, sideF_raw = 0, sideB_raw = 0, longR_raw = 0;
 int mult = 70,sample = 30, breakOut = 60, cb = 0;
-void front_fix(bool isSideFix = false);
 String instruction = "", sensorData = "000000";
+char prevS = '0';
 
 volatile unsigned long time0_R=0,time1_R=0,time0_L=0,time1_L=0;
 volatile unsigned int enCountL = 0,enCountR = 0;
@@ -49,18 +55,17 @@ void Interrupt_R(void)
     time1_R = time0_R;
     time0_R = micros();
 }
-
+//TO DO: CALIBRATE THESE 2
 int deg_to_tick_R(int degree){
-  return int((double)degree*335.0/72.0)-60.0;
+  return int((double)degree*335.0/72.0)-30.0;
 }
 int deg_to_tick_L(int degree){
-  return int((double)degree*162.0/36.0)-60.0;
+  return int((double)degree*162.0/36.0)-25.0;
 }
 
 int distance_to_ticks(int dist){
   return int(29.429*(double)dist-33);
 }
-
 
 void setup()
 {
@@ -108,24 +113,36 @@ void loop()
 //execute_instructions();
 //side_angle_fix('0','0');
 //md.setSpeeds(400,0);
-front_dist_fix('0','0');
+//side_angle_fix('0','0');
 //front_angle_fix('0','0');
 //side_dist_fix('0','0');
+
+
+  left_turn(50,deg_to_tick_L(90));
+  Serial.print(deg_to_tick_R(90));
+  Serial.print(",");
+    Serial.print(enCountL);
+
+    Serial.print(",");
+
+  Serial.println(enCountR);
+  delay(1000);
+
 }
 
 void detect_surrounding(){
-  int a_0 = sensorRead(sample, A0); // range 2
-  int a_1 = sensorRead(sample, A1); // range 2
-  int a_2 = sensorRead(sample, A2); // range 2
-  int a_3 = sensorRead(sample, A3); // range 4
-  int a_4 = sensorRead(sample, A4); // range 2
-  int a_5 = sensorRead(sample, A5); // range 2
-  sensorData[0] = find_closest_2(a_0, 529, 275, 185);
-  sensorData[1] = find_closest_2(a_1, 625, 296, 192);
-  sensorData[2] = find_closest_2(a_2, 531, 270, 187);
-  sensorData[3] = find_closest_4(a_3, 533, 423, 323, 256, 211);
-  sensorData[4] = find_closest_2(a_4, 517, 266, 179);
-  sensorData[5] = find_closest_2(a_5, 522, 257, 176);
+  frontL_raw = sensorRead(sample, frontL); // range 2
+  frontM_raw = sensorRead(sample, frontM); // range 2
+  frontR_raw = sensorRead(sample, frontR); // range 2
+  longR_raw  = sensorRead(sample, longR); // range 4
+  sideB_raw = sensorRead(sample, sideB); // range 2
+  sideF_raw = sensorRead(sample, sideF); // range 2
+  sensorData[FRONT_LEFT] = find_closest_2(frontL_raw, 529, 275, 185);
+  sensorData[FRONT_MID] = find_closest_2(frontM_raw, 625, 296, 192);
+  sensorData[FRONT_RIGHT] = find_closest_2(frontR_raw, 531, 270, 187);
+  sensorData[LONG_RANGE] = find_closest_4(longR_raw, 533, 423, 323, 256, 211);
+  sensorData[SIDE_BACK] = find_closest_2(sideB_raw, 517, 266, 179);
+  sensorData[SIDE_FRONT] = find_closest_2(sideF_raw, 522, 257, 176);
 }
 
 char find_closest_2(int reading, int range_0, int range_1, int range_2){
@@ -211,7 +228,7 @@ void side_angle_fix(char front, char back){
    if(front == '1')
       front_offset = 10;
    if (back == '1')
-      back_offset = 11;
+      back_offset = 10;
     cb = 0;
     sideF_raw = sensorRead(sample, sideF);
     sideB_raw = sensorRead(sample, sideB);
@@ -223,6 +240,7 @@ void side_angle_fix(char front, char back){
     diff_S = sideF_cm-sideB_cm;
     
     while (abs(diff_S)>0.2 && cb<80){
+//      diff_S = max(0.5,min(abs(diff_S),1))*(diff_S>=0? 1:-1);
       if(abs(diff_S)<0.5){
         if(diff_S<0)
           diff_S=-0.5;
@@ -248,15 +266,20 @@ void side_angle_fix(char front, char back){
 void side_dist_fix(char front, char back){
   if (front == '2' || back == '2')
       return;
+  int limit = 20;
   sideF_raw = sensorRead(sample, sideF);
   sideB_raw = sensorRead(sample, sideB);
   
   diff_sf = sideF_raw - 562;
   diff_sb = sideB_raw - 520;
-  if(front == '1')
+  if(front == '1'){
     diff_sf = sideF_raw - 268;
-  if(back == '1')
+    limit = limit/2;
+  }
+  if(back == '1'){
     diff_sb = sideB_raw - 263;
+    limit = limit/2;
+  }
   
   if(abs(diff_sf)>15 && abs(diff_sb)>15){
       //turn left
@@ -281,11 +304,11 @@ void side_dist_fix(char front, char back){
 void front_angle_fix(char right, char left){
   if (right == '2' || left == '2')
       return;
-   double right_offset = 0.5, left_offset = 0;
+   float right_offset = 0.5, left_offset = 0;
    if(right == '1')
-      right_offset = 10.5;
+      right_offset = 10;
    if (left == '1')
-      left_offset = 10;
+      left_offset = 11;
   frontL_raw = sensorRead(sample, frontL);
   frontR_raw = sensorRead(sample, frontR);
   frontL_cm = convertToCM_fl(frontL_raw) - left_offset;
@@ -294,8 +317,6 @@ void front_angle_fix(char right, char left){
   cb = 0;
   while (abs(diff_F)>0.2 && cb<breakOut){
 
-
-    
       if(abs(diff_F)<0.5){
         if(diff_F<0) diff_F=-0.5;
         else diff_F=0.5;
@@ -311,6 +332,7 @@ void front_angle_fix(char right, char left){
     frontL_cm = convertToCM_fl(sensorRead(sample, frontL)) - left_offset;
     frontR_cm= convertToCM_fr(sensorRead(sample, frontR)) - right_offset;
     diff_F = frontL_cm-frontR_cm;
+//    Serial.println(diff_F);
     cb++;
   }
   md.setBrakes(400,400);
@@ -321,27 +343,26 @@ void front_angle_fix(char right, char left){
 void front_dist_fix(char right, char left){
   if (right == '2' || left == '2')
       return;
-  int lRaw = 0, lLimit = 0, rRaw = 0, rLimit = 0;
-  double lMult = 0, rMult = 0;
+  int lRaw = 0,rRaw = 0,lLimit = 0, rLimit = 0, lMinSpeed=50,rMinSpeed=50;
+  double lMult = 1, rMult = 1;
+  int lSpeed = 0, rSpeed = 0;
    //Serial.println("front_dist_fix start");
   if(left == '0'){
     lRaw = 532;
-    lLimit = 3;
-    lMult = 1;
+    lLimit =6;
   }else if(left == '1'){
     lRaw = 264;  
     lLimit = 3; 
-    lMult = 1;
+    lMult = 2;
   }
 
   if(right == '0'){
     rRaw = 532;
-    rLimit = 3;
-    rMult = 1;
+    rLimit = 6;
   }else if(right == '1'){
     rRaw = 268; 
     rLimit = 3; 
-    rMult = 1;
+    rMult =2;
   }
 
   frontL_raw = sensorRead(sample, frontL);
@@ -351,32 +372,41 @@ void front_dist_fix(char right, char left){
   cb = 0;
   int speedLimit = 50;
   while ((abs(diff_fl)>lLimit || abs(diff_fr)>rLimit) && cb<breakOut){
-//    if (diff_fl <  0 )
-//        
-//    diff_fl = max(45,min(diff_fl,150))*((diff_fl<0)? -1:1);
-//    diff_fr = max(45,min(diff_fr,150))*((diff_fr<0)? -1:1);
-   // Serial.println(diff_fr);
-    if (diff_fl < -3  && diff_fl > -speedLimit)
-        diff_fl = -speedLimit;
-    if (diff_fl >  3 && diff_fl < speedLimit)
-        diff_fl = speedLimit;
-        
-    if (diff_fr <  -3 && diff_fr > -speedLimit)
-        diff_fr = -speedLimit;
-    if (diff_fr >  3 && diff_fr < speedLimit)
-        diff_fr = speedLimit;
-    
+
+//    if(abs(diff_fl)>lLimit) diff_fl = max(lMinSpeed,min(abs(diff_fl),lMax))*((diff_fl<0)? -1:1);
+//    if(abs(diff_fr)>rLimit) diff_fr = max(rMinSpeed,min(abs(diff_fr),rMax))*((diff_fr<0)? -1:1);
+//    
+    diff_fl*= lMult;
+    diff_fr*= rMult;
+    if (diff_fl < -lLimit  && diff_fl > -lMinSpeed)
+        diff_fl = -lMinSpeed;
+    if (diff_fl >  lLimit && diff_fl < lMinSpeed)
+        diff_fl = lMinSpeed;
+    if (diff_fr <  -rLimit && diff_fr > -rMinSpeed)
+        diff_fr = -rMinSpeed;
+    if (diff_fr >  rLimit && diff_fr < rMinSpeed)
+        diff_fr = rMinSpeed;
+
+    if(abs(diff_fl) == lMinSpeed)lMinSpeed++;
+    if(abs(diff_fr) == rMinSpeed)rMinSpeed++;
+//    lSpeed = max(lMinSpeed,min(lMax,abs(lSpeed)))* (lSpeed>=0?1:-1);
+//    rSpeed = max(rMinSpeed,min(rMax,abs(rSpeed)))* (rSpeed>=0?1:-1);
+//    if(abs(lSpeed)==lMinSpeed)lMinSpeed++;
+//    if(abs(rSpeed)==rMinSpeed)rMinSpeed++;
     md.setSpeeds(-diff_fr, -diff_fl);
+
 //    delay(90);
 //    md.setSpeeds(0,0);
 //    delay(10);
     frontL_raw = sensorRead(sample, frontL);
     frontR_raw = sensorRead(sample, frontR);
-//    Serial.print(frontL_raw);
-//    Serial.print(" ");
-//    Serial.println(frontR_raw);
+
+    
     diff_fl = frontL_raw - lRaw;
     diff_fr = frontR_raw - rRaw;
+//    Serial.print(diff_fl);
+//    Serial.print(" ");
+//    Serial.println(diff_fr);
     cb++;
   }
     md.setBrakes(400,400);
@@ -570,29 +600,38 @@ double convertToCM_sf(double val){
 void forward(int setRPM, int num){
     enCountL = 0;
     enCountR = 0;
-    
+    int limit = 0 ,diffL = 0,diffR = 0;
+   
     startMotor(0, setRPM);
     u_L = setRPM;
     u_R = setRPM;
-    while (enCountL<num){
+    while (enCountL<num && enCountR<num){
+      
       set_rpm(setRPM);
       speed_L = (u_L + 20.7)*2.778;
-      speed_R = (u_R + 22.3)*2.703;
+      speed_R = (u_R + 23.9)*2.793;
       md.setSpeeds(speed_R, speed_L);
     }
 
-    stopMotor(0, setRPM);
 
+
+    stopMotor(0, setRPM);
+//    Serial.print(enCountL);
+//    Serial.print(",");
+//    Serial.println(enCountR);
+//    delay(100);
+//    Serial.print(enCountL);
+//    Serial.print(",");
+//    Serial.println(enCountR);
 }
 
 void right_turn(int setRPM, int num){
     enCountL=0;
     enCountR=0;
-    
     startMotor(1, setRPM);
     u_L = setRPM;
     u_R = setRPM;
-    while (enCountL < num){
+    while (enCountL<num && enCountR<num){
     set_rpm(setRPM);
     speed_L = (u_L + 20.7)*2.778;
     speed_R = (u_R + 22.5)*2.703;
@@ -621,14 +660,14 @@ void left_turn(int setRPM, int num){
     md.setSpeeds(speed_R, -speed_L);
     }
     //stopMotor(2, setRPM);
-    Serial.print(enCountR);
-    Serial.print(" ");
-    Serial.println(enCountL);
+//    Serial.print(enCountR);
+//    Serial.print(" ");
+//    Serial.println(enCountL);
     stopMotor(2, setRPM);
     delay(200);
-    Serial.print(enCountR);
-    Serial.print(" ");
-    Serial.println(enCountL);
+//    Serial.print(enCountR);
+//    Serial.print(" ");
+//    Serial.println(enCountL);
 }
 
 void startMotor(int dir, int u){
@@ -684,38 +723,20 @@ void stopMotor(int dir, int u){
             md.setSpeeds(speed_R*2, speed_L*2);   // forward
             delay(acc_rate);
             md.setSpeeds(speed_R, speed_L);   // forward
-//            delay(acc_rate);
-//            md.setSpeeds(speed_R, speed_L);   // forward
+         md.setSpeeds(speed_R, speed_L);   // forward
             break;
     case 1: speed_L = (u + 20.7)*0.347; //2.778
             speed_R = (u + 25.3)*0.337; //2.703
-            md.setSpeeds(-speed_R*7, speed_L*7);   // right
-            delay(acc_rate);
-            md.setSpeeds(-speed_R*6, speed_L*6);   // right
-            delay(acc_rate);
-            md.setSpeeds(-speed_R*5, speed_L*5);   // right
-            delay(acc_rate);
             md.setSpeeds(-speed_R*4, speed_L*4);   // right
-            delay(acc_rate);
-            md.setSpeeds(-speed_R*3, speed_L*3);   // right
             delay(acc_rate);
             md.setSpeeds(-speed_R*2, speed_L*2);   // right
             delay(acc_rate);
-            md.setSpeeds(-speed_R, speed_L);   // right
+            md.setSpeeds(-speed_R, speed_L);   // righ
             break;
     case 2: speed_R = (u + 22.3)*0.337;//2.703
             speed_L = (u + 18.3)*0.375; //2.875
-            md.setSpeeds(speed_R*8, -speed_L*8);   // left
-            delay(acc_rate);
-            md.setSpeeds(speed_R*7, -speed_L*7);   // left
-            delay(acc_rate);
-            md.setSpeeds(speed_R*6, -speed_L*6);   // left
-            delay(acc_rate);
-            md.setSpeeds(speed_R*5, -speed_L*5);   // left
-            delay(acc_rate);
+
             md.setSpeeds(speed_R*4, -speed_L*4);   // left
-            delay(acc_rate);
-            md.setSpeeds(speed_R*3, -speed_L*3);   // left
             delay(acc_rate);
             md.setSpeeds(speed_R*2, -speed_L*2);   // left
             delay(acc_rate);
