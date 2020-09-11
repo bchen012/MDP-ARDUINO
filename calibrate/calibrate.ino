@@ -20,7 +20,7 @@ double diff_fl = 0, diff_fr = 0, diff_sf = 0, diff_sb = 0, diff_F = 0, diff_S = 
 double  frontL_raw = 0, frontR_raw= 0, sideF_raw = 0, sideB_raw = 0;
 int mult = 70,sample = 30, breakOut = 60, cb = 0;
 void front_fix(bool isSideFix = false);
-String instruction = "F1F1F1F1F1F1F1F1F1F1F1F1RF1F1R", sensorData = "000000";
+String instruction = "", sensorData = "000000";
 
 volatile unsigned long time0_R=0,time1_R=0,time0_L=0,time1_L=0;
 volatile unsigned int enCountL = 0,enCountR = 0;
@@ -106,9 +106,9 @@ void loop()
 //front_dist_fix(sensorData[2],sensorData[0]);
 //recieve_instruction();
 //execute_instructions();
-//side_angle_fix('1','0');
+//side_angle_fix('0','0');
 //md.setSpeeds(400,0);
-//front_dist_fix('0','0');
+front_dist_fix('0','0');
 //front_angle_fix('0','0');
 //side_dist_fix('0','0');
 }
@@ -223,14 +223,19 @@ void side_angle_fix(char front, char back){
     diff_S = sideF_cm-sideB_cm;
     
     while (abs(diff_S)>0.2 && cb<80){
-      if(diff_S<0)
-        diff_S=-1;
-      else
-        diff_S=1;
-      md.setSpeeds(diff_S*mult, -diff_S*mult);
-      delay(90);
-      md.setSpeeds(0,0);
-      delay(10);
+      if(abs(diff_S)<0.5){
+        if(diff_S<0)
+          diff_S=-0.5;
+        else
+          diff_S=0.5;
+      }
+      if(abs(diff_S)>0.8){
+        if(diff_S<0)
+          diff_S=-0.8;
+        else
+          diff_S=0.8;
+      }
+      md.setSpeeds(diff_S*100, -diff_S*100);
       sideF_cm = convertToCM_sf(sensorRead(sample, sideF)) - front_offset;
       sideB_cm = convertToCM_sb(sensorRead(sample, sideB)) - back_offset;
       diff_S = sideF_cm-sideB_cm;
@@ -288,14 +293,21 @@ void front_angle_fix(char right, char left){
   diff_F = frontL_cm-frontR_cm;  
   cb = 0;
   while (abs(diff_F)>0.2 && cb<breakOut){
-    if(diff_F<0)
-        diff_F=-1;
-      else
-        diff_F=1;
-      md.setSpeeds(-diff_F*mult, diff_F*mult);
-      delay(80);
-      md.setSpeeds(0,0);
-      delay(10);
+
+
+    
+      if(abs(diff_F)<0.5){
+        if(diff_F<0) diff_F=-0.5;
+        else diff_F=0.5;
+      }
+      if(abs(diff_F)>0.8){
+        if(diff_F<0) diff_F=-0.8;
+        else diff_F=0.8;
+      }
+      md.setSpeeds(-diff_F*100, diff_F*100);  
+
+
+      
     frontL_cm = convertToCM_fl(sensorRead(sample, frontL)) - left_offset;
     frontR_cm= convertToCM_fr(sensorRead(sample, frontR)) - right_offset;
     diff_F = frontL_cm-frontR_cm;
@@ -337,26 +349,27 @@ void front_dist_fix(char right, char left){
   diff_fl = frontL_raw - lRaw;
   diff_fr = frontR_raw - rRaw;
   cb = 0;
+  int speedLimit = 50;
   while ((abs(diff_fl)>lLimit || abs(diff_fr)>rLimit) && cb<breakOut){
 //    if (diff_fl <  0 )
 //        
 //    diff_fl = max(45,min(diff_fl,150))*((diff_fl<0)? -1:1);
 //    diff_fr = max(45,min(diff_fr,150))*((diff_fr<0)? -1:1);
    // Serial.println(diff_fr);
-    if (diff_fl <  0 && diff_fl > -70)
-        diff_fl = -70;
-    if (diff_fl >  0 && diff_fl < 70)
-        diff_fl = 70;
+    if (diff_fl < -3  && diff_fl > -speedLimit)
+        diff_fl = -speedLimit;
+    if (diff_fl >  3 && diff_fl < speedLimit)
+        diff_fl = speedLimit;
         
-    if (diff_fr <  0 && diff_fr > -70)
-        diff_fr = -70;
-    if (diff_fr >  0 && diff_fr < 70)
-        diff_fr = 70;
+    if (diff_fr <  -3 && diff_fr > -speedLimit)
+        diff_fr = -speedLimit;
+    if (diff_fr >  3 && diff_fr < speedLimit)
+        diff_fr = speedLimit;
     
     md.setSpeeds(-diff_fr, -diff_fl);
-    delay(90);
-    md.setSpeeds(0,0);
-    delay(10);
+//    delay(90);
+//    md.setSpeeds(0,0);
+//    delay(10);
     frontL_raw = sensorRead(sample, frontL);
     frontR_raw = sensorRead(sample, frontR);
 //    Serial.print(frontL_raw);
@@ -469,7 +482,7 @@ double convertToCM_fl(double val){
 
 //A4
 double convertToCM_sb(double val){
- int dist;
+ double dist;
   if(val>630)
     dist=3;
   else if(val<=630&&val>601)  //3cm to 4cm
@@ -512,7 +525,7 @@ double convertToCM_sb(double val){
 }
 //A5
 double convertToCM_sf(double val){
- int dist;
+ double dist;
   if(val>627)
     dist=3;
   else if(val<=627&&val>600)  //3cm to 4cm
