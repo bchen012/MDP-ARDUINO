@@ -25,7 +25,8 @@ double frontL_cm = 0, frontR_cm = 0, sideF_cm =0, sideB_cm=0;
 double diff_fl = 0, diff_fr = 0, diff_sf = 0, diff_sb = 0, diff_F = 0, diff_S = 0;
 double  frontL_raw = 0,frontM_raw = 0, frontR_raw= 0, sideF_raw = 0, sideB_raw = 0, longR_raw = 0;
 int mult = 70,sample = 30, breakOut = 60, cb = 0;
-String instruction = "", sensorData = "000000";
+String sensorData = "000000";
+char instruction[20]="";
 char prevS = '0';
 
 volatile unsigned long time0_R=0,time1_R=0,time0_L=0,time1_L=0;
@@ -57,10 +58,10 @@ void Interrupt_R(void)
 }
 //TO DO: CALIBRATE THESE 2
 int deg_to_tick_R(int degree){
-  return int((double)degree*335.0/72.0)-30.0;
+  return int((double)degree*4.6)-28;
 }
 int deg_to_tick_L(int degree){
-  return int((double)degree*162.0/36.0)-25.0;
+  return int((double)degree*4.66)-32;
 }
 
 int distance_to_ticks(int dist){
@@ -91,8 +92,7 @@ void loop()
 //  int a_4 = sensorRead(sample, A3);
 //  int a_1 = sensorRead(sample, A4);
 //  int a_5 = sensorRead(sample, A5);
-//  
-//
+
 //  if(a_5 <1000 && a_4<1000 ){
 //    Serial.print(a_4);
 //    Serial.print(" ");
@@ -105,29 +105,15 @@ void loop()
 //detect_surrounding();   // need calibrate
 //Serial.println(sensorData);
 //delay(500);
-//send_data();   
-//side_dist_fix(sensorData[2],sensorData[0]);
-//front_angle_fix(sensorData[2],sensorData[0]);
-//front_dist_fix(sensorData[2],sensorData[0]);
+//send_data();   3
 //recieve_instruction();
 //execute_instructions();
-//side_angle_fix('0','0');
-//md.setSpeeds(400,0);
-//side_angle_fix('0','0');
-//front_angle_fix('0','0');
-//side_dist_fix('0','0');
 
-
-  left_turn(50,deg_to_tick_L(90));
-  Serial.print(deg_to_tick_R(90));
-  Serial.print(",");
-    Serial.print(enCountL);
-
-    Serial.print(",");
-
-  Serial.println(enCountR);
-  delay(1000);
-
+  delay(250);
+  int reading = sensorRead(sample,longR);
+  Serial.print(reading);
+  Serial.print(',');
+  Serial.println(convertToCM_lr(reading));
 }
 
 void detect_surrounding(){
@@ -176,30 +162,39 @@ char find_closest_4(int reading, int range_0, int range_1, int range_2, int rang
 }
 
 void send_data(){
-  Serial.println(sensorData);
+  String s = "[b]"+sensorData;
+  Serial.println(s);
+  s = "[c]sensorData"+sensorData;
+  Serial.println(s);
 }
 
 void recieve_instruction(){
-  while (!Serial.available());
-  // wait for string
-  while (Serial.available()) {
+  int i = 0;
+  char inBit;
+  while (Serial.available()==0);
+  // wait for string;
+  while (true) {
     // read the incoming byte:
-      instruction = Serial.readString();
+      instruction[i] = Serial.read();
+      if(instruction[i] == '\0'  || instruction[i] == '\n' || instruction[i] == '\r') break;
+      i++;
+      
       if (instruction == "End\n"){
         Serial.println("Finished"); // turn off send data
         while(1);
       }
-      Serial.println(instruction);
-      Serial.println("Received");
+      delay(50);
   }
 }
 
 void execute_instructions(){
-  for(int i = 0; i<instruction.length(); i++){
+  //F1
+  for(int i = 0; i<20 && instruction[i] != '\0'&& instruction[i] != '\n'&& instruction[i] != '\r'; i++){
     switch(instruction[i]){
-      case 'F': 
+      case 'F':
         i++;
         forward(60, distance_to_ticks(10*(instruction[i]-'0')));
+      i--;
         break;
       case 'L':
         left_turn(60, deg_to_tick_L(90));
@@ -210,13 +205,33 @@ void execute_instructions(){
       default:
         break;
     }
-    delay(100);
-    Serial.println("[b]Finished");
-    detect_surrounding();
-    side_dist_fix(sensorData[5],sensorData[4]);
-    front_angle_fix(sensorData[2],sensorData[0]);
-    front_dist_fix(sensorData[2],sensorData[0]);
+    
+//    detect_surrounding();
+//    front_angle_fix(sensorData[FRONT_RIGHT],sensorData[FRONT_LEFT]);
+//    front_dist_fix(sensorData[FRONT_RIGHT],sensorData[FRONT_LEFT]);
+//    side_angle_fix(sensorData[SIDE_FRONT],sensorData[SIDE_BACK]);
+
+//
+   String content = "[b]F";
+    switch(instruction[i]){
+      case 'F': 
+        i++;
+        content+= instruction[i];
+//        content.concat(String(instruction[i]));
+        Serial.println(content);
+        break;
+      case 'L':
+        Serial.println("[b]L");
+        break;
+      case 'R':
+        Serial.println("[b]R");
+        break;
+      default:
+        break;
+    }
   }
+    //side_dist_fix(sensorData[SIDE_FRONT],sensorData[SIDE_BACK]);
+
   
 }
 
@@ -597,6 +612,31 @@ double convertToCM_sf(double val){
   return dist;
 }
 
+double convertToCM_lr(double val){
+ double dist;
+ if(val>291)
+  dist=30;
+ else if(val<=291&&val>260) //30cm to 35cm
+  dist=(val-477.0)/-6.2;
+ else if(val<=260&&val>236) //35cm to 40cm
+  dist=(val-428.0)/-4.8;
+ else if(val<=236&&val>216) //40cm to 45cm
+  dist=(val-396.0)/-4.0;
+ else if(val<=216&&val>198) //45cm to 50cm
+  dist=(val-378.0)/-3.6;
+ else if(val<=198&&val>185) //50cm to 55cm
+  dist=(val-328.0)/-2.6;
+ else if(val<=185&&val>173) //55cm to 60cm
+  dist=(val-317.0)/-2.4;
+ else if(val<=173&&val>161) //60cm to 65cm
+  dist=(val-317.0)/-2.4;
+ else if(val<=161&&val>152) //65cm to 70cm
+  dist=(val-278.0)/-1.8;
+ else
+  dist=70;
+ return dist;
+}
+
 void forward(int setRPM, int num){
     enCountL = 0;
     enCountR = 0;
@@ -631,20 +671,23 @@ void right_turn(int setRPM, int num){
     startMotor(1, setRPM);
     u_L = setRPM;
     u_R = setRPM;
-    while (enCountL<num && enCountR<num){
+    while (enCountL<num){
     set_rpm(setRPM);
-    speed_L = (u_L + 20.7)*2.778;
-    speed_R = (u_R + 22.5)*2.703;
+//    speed_L = (u_L + 20.7)*2.778;
+//    speed_R = (u_R + 22.5)*2.703;    
+      speed_L = u_L*2.778+57.5;
+      speed_R = u_R*2.703+60.8;    
+
     md.setSpeeds(-speed_R, speed_L);
     }
-    Serial.print(enCountR);
-    Serial.print(" ");
-    Serial.println(enCountL);
+//    Serial.print(enCountR);
+//    Serial.print(" ");
+//    Serial.println(enCountL);
     stopMotor(1, setRPM);
     delay(200);
-    Serial.print(enCountR);
-    Serial.print(" ");
-    Serial.println(enCountL);
+//    Serial.print(enCountR);
+//    Serial.print(" ");
+//    Serial.println(enCountL);
 }
 void left_turn(int setRPM, int num){
     enCountL=0;
@@ -655,9 +698,11 @@ void left_turn(int setRPM, int num){
     u_R = setRPM;
     while (enCountL < num){
     set_rpm(setRPM);
-    speed_L = (u_L + 18.3)*2.857;
-    speed_R = (u_R + 22.3)*2.703;
-    md.setSpeeds(speed_R, -speed_L);
+//    speed_L = (u_L + 18.3)*2.857;
+//    speed_R = (u_R + 22.3)*2.703;
+    speed_L = int(u_L*2.857+52.3);
+    speed_R = int(u_R*2.703+60.3);
+    md.setSpeeds(speed_R, -speed_L);                                   
     }
     //stopMotor(2, setRPM);
 //    Serial.print(enCountR);
