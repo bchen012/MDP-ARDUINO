@@ -36,7 +36,7 @@ double u_L = 0, rpm_L = 0;
 double u_R = 0, rpm_R = 0;
 int turn_time = 65, startSpeed = 200, forwardSpeed = 62;
 signed int speed_R = 0, speed_L = 0;
-double tick360L = 1668, tick360R = 1669;  
+double tick360L = 1678, tick360R = 1676;  
 bool enable_send_data = true;
 int send_ack=0;
 
@@ -60,7 +60,7 @@ int deg_to_tick_L(double degree){
   return int(((tick360L)/360)*degree - 36);
 }
 int distance_to_ticks(int dist){
-  return int(29.429*(double)dist-36);
+  return int(29.429*(double)dist-38);
 }
 
 void setup()
@@ -117,7 +117,9 @@ void setup()
 
 
 void loop()
-{
+{   
+
+  //501 494 477 469
   recieve_instruction();
   execute_instructions();  // calls detect surrounding in execute_instructions()
   send_data();
@@ -265,10 +267,9 @@ void execute_instructions(){
     
     
     detect_surrounding();
-    front_dist_fix(sensorData[FRONT_RIGHT],sensorData[FRONT_LEFT]);
     if (!side_angle_fix(sensorData[SIDE_FRONT],sensorData[SIDE_BACK]))
-        front_angle_fix(sensorData[FRONT_RIGHT],sensorData[FRONT_LEFT]);
-
+        front_angle_fix(sensorData[FRONT_RIGHT],sensorData[FRONT_LEFT]);        
+    front_dist_fix(sensorData[FRONT_RIGHT],sensorData[FRONT_LEFT]);
 //    delay(100);
   }
   if (!enable_send_data){
@@ -335,8 +336,8 @@ void side_dist_fix(char front, char back){
   sideF_raw = sensorRead(sample, sideF);
   sideB_raw = sensorRead(sample, sideB);
   
-  diff_sf = sideF_raw - 562;
-  diff_sb = sideB_raw - 520;
+  diff_sf = sideF_raw - 469;
+  diff_sb = sideB_raw - 477;
 //  if(front == '1'){
 //    diff_sf = sideF_raw - 268;
 //  }
@@ -344,7 +345,7 @@ void side_dist_fix(char front, char back){
 //    diff_sb = sideB_raw - 263;
 //  }
   
-  if(abs(diff_sf)>100 || abs(diff_sb)>100){
+  if(abs(diff_sf)>40 || abs(diff_sb)>40){
       //turn left
       side_angle_fix(front, back);
       delay(50);
@@ -378,7 +379,7 @@ void front_angle_fix(char right, char left){
   frontR_cm = convertToCM_fr(frontR_raw) - right_offset;
   diff_F = frontL_cm-frontR_cm;  
   cb = 0;
-  while (abs(diff_F)>0.5 && cb<breakOut){
+  while (abs(diff_F)>0.2 && cb<breakOut){
 
       if(abs(diff_F)<0.5){
         if(diff_F<0) diff_F=-0.5;
@@ -410,7 +411,7 @@ void front_dist_fix(char right, char left){
   int lSpeed = 0, rSpeed = 0;
    //Serial.println("front_dist_fix start");
   if(left == '0'){
-    lRaw = 532;
+    lRaw = 501;
     lLimit =6;
   }else if(left == '1'){
     lRaw = 264;  
@@ -419,7 +420,7 @@ void front_dist_fix(char right, char left){
   }
 
   if(right == '0'){
-    rRaw = 532;
+    rRaw = 494;
     rLimit = 6;
   }else if(right == '1'){
     rRaw = 268; 
@@ -475,214 +476,89 @@ void front_dist_fix(char right, char left){
  //Serial.println("done");
 }
 
-//A2
-double convertToCM_fr(double val){
-  double dist;
-  if(val>628)
-    dist=1;
-  else if(val<=628&&val>618)  //1cm to 2cm
-    dist=(val-638.0)/-10.0;
-  else if(val<=618&&val>573)  //2cm to 3cm
-    dist=(val-708.0)/-45.0;
-  else if(val<=573&&val>518)  //3cm to 4cm
-    dist=(val-738.0)/-55.0;
-  else if(val<=518&&val>482)  //4cm to 5cm
-    dist=(val-662.0)/-36.0;
-  else if(val<=482&&val>439)  //5cm to 6cm
-    dist=(val-697.0)/-43.0;
-  else if(val<=439&&val>402)  //6cm to 7cm
-    dist=(val-661.0)/-37.0;
-  else if(val<=402&&val>377)  //7cm to 8cm
-    dist=(val-577.0)/-25.0;
-  else if(val<=377&&val>351)  //8cm to 9cm
-    dist=(val-585.0)/-26.0;
-  else if(val<=351&&val>329)  //9cm to 10cm
-    dist=(val-549.0)/-22.0;
-  else if(val<=329&&val>309)  //10cm to 11cm
-    dist=(val-529.0)/-20.0;
-  else if(val<=309&&val>295)  //11cm to 12cm
-    dist=(val-463.0)/-14.0;
-  else if(val<=295&&val>279)  //12cm to 13cm
-    dist=(val-487.0)/-16.0;
-  else if(val<=279&&val>265)  //13cm to 14cm
-    dist=(val-461.0)/-14.0;
-  else if(val<=265&&val>255)  //14cm to 15cm
-    dist=(val-405.0)/-10.0;
-  else if(val<=255&&val>243)  //15cm to 16cm
-    dist=(val-435.0)/-12.0;
-  else if(val<=243&&val>232)  //16cm to 17cm
-    dist=(val-419.0)/-11.0;
-  else if(val<=232&&val>224)  //17cm to 18cm
-    dist=(val-368.0)/-8.0;
-  else if(val<=224&&val>213)  //18cm to 19cm
-    dist=(val-422.0)/-11.0;
-  else if(val<=213&&val>205)  //19cm to 20cm
-    dist=(val-365.0)/-8.0;
-  else
-    dist=20.0;
-  return dist;
-}
-
-
-//A0
 double convertToCM_fl(double val){
   double dist;
-  if(val>625)
-    dist=1;
-  else if(val<=625&&val>617)  //1cm to 2cm
-    dist=(val-633.0)/-8.0;
-  else if(val<=617&&val>563)  //2cm to 3cm
-    dist=(val-725.0)/-54.0;
-  else if(val<=563&&val>514)  //3cm to 4cm
-    dist=(val-710.0)/-49.0;
-  else if(val<=514&&val>467)  //4cm to 5cm
-    dist=(val-702.0)/-47.0;
-  else if(val<=467&&val>435)  //5cm to 6cm
-    dist=(val-627.0)/-32.0;
-  else if(val<=435&&val>401)  //6cm to 7cm
-    dist=(val-639.0)/-34.0;
-  else if(val<=401&&val>376)  //7cm to 8cm
-    dist=(val-576.0)/-25.0;
-  else if(val<=376&&val>350)  //8cm to 9cm
-    dist=(val-584.0)/-26.0;
-  else if(val<=350&&val>328)  //9cm to 10cm
-    dist=(val-548.0)/-22.0;
-  else if(val<=328&&val>312)  //10cm to 11cm
-    dist=(val-488.0)/-16.0;
-  else if(val<=312&&val>297)  //11cm to 12cm
-    dist=(val-477.0)/-15.0;
-  else if(val<=297&&val>282)  //12cm to 13cm
-    dist=(val-477.0)/-15.0;
-  else if(val<=282&&val>267)  //13cm to 14cm
-    dist=(val-477.0)/-15.0;
-  else if(val<=267&&val>256)  //14cm to 15cm
-    dist=(val-421.0)/-11.0;
-  else if(val<=256&&val>246)  //15cm to 16cm
-    dist=(val-406.0)/-10.0;
-  else if(val<=246&&val>238)  //16cm to 17cm
-    dist=(val-374.0)/-8.0;
-  else if(val<=238&&val>227)  //17cm to 18cm
-    dist=(val-425.0)/-11.0;
-  else if(val<=227&&val>219)  //18cm to 19cm
-    dist=(val-371.0)/-8.0;
-  else if(val<=219&&val>211)  //19cm to 20cm
-    dist=(val-371.0)/-8.0;
-  else
-    dist=20.0;
+  if(val>626) dist=1;
+  else if(val<=626&&val>625) dist=(val-627.0)/-1.0; //1cm to 2cm
+  else if(val<=625&&val>590) dist=(val-695.0)/-35.0; //2cm to 3cm
+  else if(val<=590&&val>539) dist=(val-743.0)/-51.0; //3cm to 4cm
+  else if(val<=539&&val>492) dist=(val-727.0)/-47.0; //4cm to 5cm
+  else if(val<=492&&val>453) dist=(val-687.0)/-39.0; //5cm to 6cm
+  else if(val<=453&&val>420) dist=(val-651.0)/-33.0; //6cm to 7cm
+  else if(val<=420&&val>388) dist=(val-644.0)/-32.0; //7cm to 8cm
+  else if(val<=388&&val>365) dist=(val-572.0)/-23.0; //8cm to 9cm
+  else if(val<=365&&val>343) dist=(val-563.0)/-22.0; //9cm to 10cm
+  else if(val<=343&&val>324) dist=(val-533.0)/-19.0; //10cm to 11cm
+  else if(val<=324&&val>305) dist=(val-533.0)/-19.0; //11cm to 12cm
+  else if(val<=305&&val>290) dist=(val-485.0)/-15.0; //12cm to 13cm
+  else if(val<=290&&val>275) dist=(val-485.0)/-15.0; //13cm to 14cm
+  else if(val<=275&&val>264) dist=(val-429.0)/-11.0; //14cm to 15cm
+  else dist=15;
+  return dist;
+}
+double convertToCM_fr(double val){
+  double dist;
+  if(val>629) dist=1;
+  else if(val<=629&&val>628) dist=(val-630.0)/-1.0; //1cm to 2cm
+  else if(val<=628&&val>593) dist=(val-698.0)/-35.0; //2cm to 3cm
+  else if(val<=593&&val>539) dist=(val-755.0)/-54.0; //3cm to 4cm
+  else if(val<=539&&val>494) dist=(val-719.0)/-45.0; //4cm to 5cm
+  else if(val<=494&&val>457) dist=(val-679.0)/-37.0; //5cm to 6cm
+  else if(val<=457&&val>417) dist=(val-697.0)/-40.0; //6cm to 7cm
+  else if(val<=417&&val>388) dist=(val-620.0)/-29.0; //7cm to 8cm
+  else if(val<=388&&val>365) dist=(val-572.0)/-23.0; //8cm to 9cm
+  else if(val<=365&&val>343) dist=(val-563.0)/-22.0; //9cm to 10cm
+  else if(val<=343&&val>325) dist=(val-523.0)/-18.0; //10cm to 11cm
+  else if(val<=325&&val>305) dist=(val-545.0)/-20.0; //11cm to 12cm
+  else if(val<=305&&val>290) dist=(val-485.0)/-15.0; //12cm to 13cm
+  else if(val<=290&&val>275) dist=(val-485.0)/-15.0; //13cm to 14cm
+  else if(val<=275&&val>264) dist=(val-429.0)/-11.0; //14cm to 15cm
+  else dist=15;
   return dist;
 }
 
-//A4
 double convertToCM_sb(double val){
- double dist;
-  if(val>630)
-    dist=3;
-  else if(val<=630&&val>601)  //3cm to 4cm
-    dist=(val-717.0)/-29.0;
-  else if(val<=601&&val>544)  //4cm to 5cm
-    dist=(val-829.0)/-57.0;
-  else if(val<=544&&val>494)  //5cm to 6cm
-    dist=(val-794.0)/-50.0;
-  else if(val<=494&&val>447)  //6cm to 7cm
-    dist=(val-776.0)/-47.0;
-  else if(val<=447&&val>415)  //7cm to 8cm
-    dist=(val-671.0)/-32.0;
-  else if(val<=415&&val>387)  //8cm to 9cm
-    dist=(val-639.0)/-28.0;
-  else if(val<=387&&val>358)  //9cm to 10cm
-    dist=(val-648.0)/-29.0;
-  else if(val<=358&&val>335)  //10cm to 11cm
-    dist=(val-588.0)/-23.0;
-  else if(val<=335&&val>317)  //11cm to 12cm
-    dist=(val-533.0)/-18.0;
-  else if(val<=317&&val>302)  //12cm to 13cm
-    dist=(val-497.0)/-15.0;
-  else if(val<=302&&val>283)  //13cm to 14cm
-    dist=(val-549.0)/-19.0;
-  else if(val<=283&&val>274)  //14cm to 15cm
-    dist=(val-409.0)/-9.0;
-  else if(val<=274&&val>259)  //15cm to 16cm
-    dist=(val-499.0)/-15.0;
-  else if(val<=259&&val>251)  //16cm to 17cm
-    dist=(val-387.0)/-8.0;
-  else if(val<=251&&val>240)  //17cm to 18cm
-    dist=(val-438.0)/-11.0;
-  else if(val<=240&&val>228)  //18cm to 19cm
-    dist=(val-456.0)/-12.0;
-  else if(val<=228&&val>220)  //19cm to 20cm
-    dist=(val-380.0)/-8.0;
-  else
-    dist=20.0;
+  double dist;
+  if(val>630) dist=1;
+  else if(val<=630&&val>631) dist=(val-629.0)/1.0; //1cm to 2cm
+  else if(val<=631&&val>629) dist=(val-635.0)/-2.0; //2cm to 3cm
+  else if(val<=629&&val>582) dist=(val-770.0)/-47.0; //3cm to 4cm
+  else if(val<=582&&val>527) dist=(val-802.0)/-55.0; //4cm to 5cm
+  else if(val<=527&&val>484) dist=(val-742.0)/-43.0; //5cm to 6cm
+  else if(val<=484&&val>440) dist=(val-748.0)/-44.0; //6cm to 7cm
+  else if(val<=440&&val>408) dist=(val-664.0)/-32.0; //7cm to 8cm
+  else if(val<=408&&val>380) dist=(val-632.0)/-28.0; //8cm to 9cm
+  else if(val<=380&&val>355) dist=(val-605.0)/-25.0; //9cm to 10cm
+  else if(val<=355&&val>332) dist=(val-585.0)/-23.0; //10cm to 11cm
+  else if(val<=332&&val>313) dist=(val-541.0)/-19.0; //11cm to 12cm
+  else if(val<=313&&val>295) dist=(val-529.0)/-18.0; //12cm to 13cm
+  else if(val<=295&&val>284) dist=(val-438.0)/-11.0; //13cm to 14cm
+  else if(val<=284&&val>270) dist=(val-480.0)/-14.0; //14cm to 15cm
+  else dist=15;
   return dist;
 }
-//A5
 double convertToCM_sf(double val){
- double dist;
-  if(val>627)
-    dist=3;
-  else if(val<=627&&val>600)  //3cm to 4cm
-    dist=(val-708.0)/-27.0;
-  else if(val<=600&&val>544)  //4cm to 5cm
-    dist=(val-824.0)/-56.0;
-  else if(val<=544&&val>491)  //5cm to 6cm
-    dist=(val-809.0)/-53.0;
-  else if(val<=491&&val>451)  //6cm to 7cm
-    dist=(val-731.0)/-40.0;
-  else if(val<=451&&val>414)  //7cm to 8cm
-    dist=(val-710.0)/-37.0;
-  else if(val<=414&&val>381)  //8cm to 9cm
-    dist=(val-678.0)/-33.0;
-  else if(val<=381&&val>355)  //9cm to 10cm
-    dist=(val-615.0)/-26.0;
-  else if(val<=355&&val>333)  //10cm to 11cm
-    dist=(val-575.0)/-22.0;
-  else if(val<=333&&val>311)  //11cm to 12cm
-    dist=(val-575.0)/-22.0;
-  else if(val<=311&&val>294)  //12cm to 13cm
-    dist=(val-515.0)/-17.0;
-  else if(val<=294&&val>279)  //13cm to 14cm
-    dist=(val-489.0)/-15.0;
-  else if(val<=279&&val>264)  //14cm to 15cm
-    dist=(val-489.0)/-15.0;
-  else if(val<=264&&val>253)  //15cm to 16cm
-    dist=(val-589.0)/-21.0;
-  else if(val<=253&&val>244)  //16cm to 17cm
-    dist=(val-397.0)/-9.0;
-  else if(val<=244&&val>233)  //17cm to 18cm
-    dist=(val-431.0)/-11.0;
-  else if(val<=233&&val>225)  //18cm to 19cm
-    dist=(val-377.0)/-8.0;
-  else if(val<=225&&val>214)  //19cm to 20cm
-    dist=(val-434.0)/-11.0;
-  else
-    dist=20.0;
+  double dist;
+  if(val>624) dist=1;
+  else if(val<=624&&val>627) dist=(val-621.0)/3.0; //1cm to 2cm
+  else if(val<=627&&val>627) dist=(val-627.0)/0.0; //2cm to 3cm
+  else if(val<=627&&val>588) dist=(val-744.0)/-39.0; //3cm to 4cm
+  else if(val<=588&&val>522) dist=(val-852.0)/-66.0; //4cm to 5cm
+  else if(val<=522&&val>480) dist=(val-732.0)/-42.0; //5cm to 6cm
+  else if(val<=480&&val>440) dist=(val-720.0)/-40.0; //6cm to 7cm
+  else if(val<=440&&val>410) dist=(val-650.0)/-30.0; //7cm to 8cm
+  else if(val<=410&&val>380) dist=(val-650.0)/-30.0; //8cm to 9cm
+  else if(val<=380&&val>352) dist=(val-632.0)/-28.0; //9cm to 10cm
+  else if(val<=352&&val>329) dist=(val-582.0)/-23.0; //10cm to 11cm
+  else if(val<=329&&val>311) dist=(val-527.0)/-18.0; //11cm to 12cm
+  else if(val<=311&&val>291) dist=(val-551.0)/-20.0; //12cm to 13cm
+  else if(val<=291&&val>279) dist=(val-447.0)/-12.0; //13cm to 14cm
+  else if(val<=279&&val>262) dist=(val-517.0)/-17.0; //14cm to 15cm
+  else dist=15;
   return dist;
 }
 
-double convertToCM_lr(double val){
- double dist;
- if(val>291)
-  dist=30;
- else if(val<=291&&val>260) //30cm to 35cm
-  dist=(val-477.0)/-6.2;
- else if(val<=260&&val>236) //35cm to 40cm
-  dist=(val-428.0)/-4.8;
- else if(val<=236&&val>216) //40cm to 45cm
-  dist=(val-396.0)/-4.0;
- else if(val<=216&&val>198) //45cm to 50cm
-  dist=(val-378.0)/-3.6;
- else if(val<=198&&val>185) //50cm to 55cm
-  dist=(val-328.0)/-2.6;
- else if(val<=185&&val>173) //55cm to 60cm
-  dist=(val-317.0)/-2.4;
- else if(val<=173&&val>161) //60cm to 65cm
-  dist=(val-317.0)/-2.4;
- else if(val<=161&&val>152) //65cm to 70cm
-  dist=(val-278.0)/-1.8;
- else
-  dist=70;
- return dist;
-}
+
 
 void forward(int setRPM, int num){
     enCountL = 0;
@@ -932,14 +808,226 @@ void merge(double ar[], double left[], double right[], int size){
 //  Serial.println(frontR_cm);
 //  delay(500);
   
-//  int a_4 = sensorRead(sample, A3);
-//  int a_1 = sensorRead(sample, A4);
+//  int a_0 = sensorRead(sample, A0);
+//  int a_2 = sensorRead(sample, A2);
+//  int a_4 = sensorRead(sample, A4);
 //  int a_5 = sensorRead(sample, A5);
 //  if(a_5 <1000 && a_4<1000 ){
-//    Serial.print(a_4);
+//    Serial.print(a_0);
 //    Serial.print(" ");
-//    Serial.print(a_1);
+//    Serial.print(a_2);
+//    Serial.print(" ");
+//    Serial.print(a_4);
 //    Serial.print(" ");
 //    Serial.println(a_5);
 //    delay(500);
 //  }
+////A2
+//double convertToCM_fr(double val){
+//  double dist;
+//  if(val>628)
+//    dist=1;
+//  else if(val<=628&&val>618)  //1cm to 2cm
+//    dist=(val-638.0)/-10.0;
+//  else if(val<=618&&val>573)  //2cm to 3cm
+//    dist=(val-708.0)/-45.0;
+//  else if(val<=573&&val>518)  //3cm to 4cm
+//    dist=(val-738.0)/-55.0;
+//  else if(val<=518&&val>482)  //4cm to 5cm
+//    dist=(val-662.0)/-36.0;
+//  else if(val<=482&&val>439)  //5cm to 6cm
+//    dist=(val-697.0)/-43.0;
+//  else if(val<=439&&val>402)  //6cm to 7cm
+//    dist=(val-661.0)/-37.0;
+//  else if(val<=402&&val>377)  //7cm to 8cm
+//    dist=(val-577.0)/-25.0;
+//  else if(val<=377&&val>351)  //8cm to 9cm
+//    dist=(val-585.0)/-26.0;
+//  else if(val<=351&&val>329)  //9cm to 10cm
+//    dist=(val-549.0)/-22.0;
+//  else if(val<=329&&val>309)  //10cm to 11cm
+//    dist=(val-529.0)/-20.0;
+//  else if(val<=309&&val>295)  //11cm to 12cm
+//    dist=(val-463.0)/-14.0;
+//  else if(val<=295&&val>279)  //12cm to 13cm
+//    dist=(val-487.0)/-16.0;
+//  else if(val<=279&&val>265)  //13cm to 14cm
+//    dist=(val-461.0)/-14.0;
+//  else if(val<=265&&val>255)  //14cm to 15cm
+//    dist=(val-405.0)/-10.0;
+//  else if(val<=255&&val>243)  //15cm to 16cm
+//    dist=(val-435.0)/-12.0;
+//  else if(val<=243&&val>232)  //16cm to 17cm
+//    dist=(val-419.0)/-11.0;
+//  else if(val<=232&&val>224)  //17cm to 18cm
+//    dist=(val-368.0)/-8.0;
+//  else if(val<=224&&val>213)  //18cm to 19cm
+//    dist=(val-422.0)/-11.0;
+//  else if(val<=213&&val>205)  //19cm to 20cm
+//    dist=(val-365.0)/-8.0;
+//  else
+//    dist=20.0;
+//  return dist;
+//}
+//
+//
+//
+////A0
+//double convertToCM_fl(double val){
+//  double dist;
+//  if(val>625)
+//    dist=1;
+//  else if(val<=625&&val>617)  //1cm to 2cm
+//    dist=(val-633.0)/-8.0;
+//  else if(val<=617&&val>563)  //2cm to 3cm
+//    dist=(val-725.0)/-54.0;
+//  else if(val<=563&&val>514)  //3cm to 4cm
+//    dist=(val-710.0)/-49.0;
+//  else if(val<=514&&val>467)  //4cm to 5cm
+//    dist=(val-702.0)/-47.0;
+//  else if(val<=467&&val>435)  //5cm to 6cm
+//    dist=(val-627.0)/-32.0;
+//  else if(val<=435&&val>401)  //6cm to 7cm
+//    dist=(val-639.0)/-34.0;
+//  else if(val<=401&&val>376)  //7cm to 8cm
+//    dist=(val-576.0)/-25.0;
+//  else if(val<=376&&val>350)  //8cm to 9cm
+//    dist=(val-584.0)/-26.0;
+//  else if(val<=350&&val>328)  //9cm to 10cm
+//    dist=(val-548.0)/-22.0;
+//  else if(val<=328&&val>312)  //10cm to 11cm
+//    dist=(val-488.0)/-16.0;
+//  else if(val<=312&&val>297)  //11cm to 12cm
+//    dist=(val-477.0)/-15.0;
+//  else if(val<=297&&val>282)  //12cm to 13cm
+//    dist=(val-477.0)/-15.0;
+//  else if(val<=282&&val>267)  //13cm to 14cm
+//    dist=(val-477.0)/-15.0;
+//  else if(val<=267&&val>256)  //14cm to 15cm
+//    dist=(val-421.0)/-11.0;
+//  else if(val<=256&&val>246)  //15cm to 16cm
+//    dist=(val-406.0)/-10.0;
+//  else if(val<=246&&val>238)  //16cm to 17cm
+//    dist=(val-374.0)/-8.0;
+//  else if(val<=238&&val>227)  //17cm to 18cm
+//    dist=(val-425.0)/-11.0;
+//  else if(val<=227&&val>219)  //18cm to 19cm
+//    dist=(val-371.0)/-8.0;
+//  else if(val<=219&&val>211)  //19cm to 20cm
+//    dist=(val-371.0)/-8.0;
+//  else
+//    dist=20.0;
+//  return dist;
+//}
+//
+////A4
+//double convertToCM_sb(double val){
+// double dist;
+//  if(val>630)
+//    dist=3;
+//  else if(val<=630&&val>601)  //3cm to 4cm
+//    dist=(val-717.0)/-29.0;
+//  else if(val<=601&&val>544)  //4cm to 5cm
+//    dist=(val-829.0)/-57.0;
+//  else if(val<=544&&val>494)  //5cm to 6cm
+//    dist=(val-794.0)/-50.0;
+//  else if(val<=494&&val>447)  //6cm to 7cm
+//    dist=(val-776.0)/-47.0;
+//  else if(val<=447&&val>415)  //7cm to 8cm
+//    dist=(val-671.0)/-32.0;
+//  else if(val<=415&&val>387)  //8cm to 9cm
+//    dist=(val-639.0)/-28.0;
+//  else if(val<=387&&val>358)  //9cm to 10cm
+//    dist=(val-648.0)/-29.0;
+//  else if(val<=358&&val>335)  //10cm to 11cm
+//    dist=(val-588.0)/-23.0;
+//  else if(val<=335&&val>317)  //11cm to 12cm
+//    dist=(val-533.0)/-18.0;
+//  else if(val<=317&&val>302)  //12cm to 13cm
+//    dist=(val-497.0)/-15.0;
+//  else if(val<=302&&val>283)  //13cm to 14cm
+//    dist=(val-549.0)/-19.0;
+//  else if(val<=283&&val>274)  //14cm to 15cm
+//    dist=(val-409.0)/-9.0;
+//  else if(val<=274&&val>259)  //15cm to 16cm
+//    dist=(val-499.0)/-15.0;
+//  else if(val<=259&&val>251)  //16cm to 17cm
+//    dist=(val-387.0)/-8.0;
+//  else if(val<=251&&val>240)  //17cm to 18cm
+//    dist=(val-438.0)/-11.0;
+//  else if(val<=240&&val>228)  //18cm to 19cm
+//    dist=(val-456.0)/-12.0;
+//  else if(val<=228&&val>220)  //19cm to 20cm
+//    dist=(val-380.0)/-8.0;
+//  else
+//    dist=20.0;
+//  return dist;
+//}
+//
+//double convertToCM_sf(double val){
+// double dist;
+//  if(val>627)
+//    dist=3;
+//  else if(val<=627&&val>600)  //3cm to 4cm
+//    dist=(val-708.0)/-27.0;
+//  else if(val<=600&&val>544)  //4cm to 5cm
+//    dist=(val-824.0)/-56.0;
+//  else if(val<=544&&val>491)  //5cm to 6cm
+//    dist=(val-809.0)/-53.0;
+//  else if(val<=491&&val>451)  //6cm to 7cm
+//    dist=(val-731.0)/-40.0;
+//  else if(val<=451&&val>414)  //7cm to 8cm
+//    dist=(val-710.0)/-37.0;
+//  else if(val<=414&&val>381)  //8cm to 9cm
+//    dist=(val-678.0)/-33.0;
+//  else if(val<=381&&val>355)  //9cm to 10cm
+//    dist=(val-615.0)/-26.0;
+//  else if(val<=355&&val>333)  //10cm to 11cm
+//    dist=(val-575.0)/-22.0;
+//  else if(val<=333&&val>311)  //11cm to 12cm
+//    dist=(val-575.0)/-22.0;
+//  else if(val<=311&&val>294)  //12cm to 13cm
+//    dist=(val-515.0)/-17.0;
+//  else if(val<=294&&val>279)  //13cm to 14cm
+//    dist=(val-489.0)/-15.0;
+//  else if(val<=279&&val>264)  //14cm to 15cm
+//    dist=(val-489.0)/-15.0;
+//  else if(val<=264&&val>253)  //15cm to 16cm
+//    dist=(val-589.0)/-21.0;
+//  else if(val<=253&&val>244)  //16cm to 17cm
+//    dist=(val-397.0)/-9.0;
+//  else if(val<=244&&val>233)  //17cm to 18cm
+//    dist=(val-431.0)/-11.0;
+//  else if(val<=233&&val>225)  //18cm to 19cm
+//    dist=(val-377.0)/-8.0;
+//  else if(val<=225&&val>214)  //19cm to 20cm
+//    dist=(val-434.0)/-11.0;
+//  else
+//    dist=20.0;
+//  return dist;
+//}
+//
+//double convertToCM_lr(double val){
+// double dist;
+// if(val>291)
+//  dist=30;
+// else if(val<=291&&val>260) //30cm to 35cm
+//  dist=(val-477.0)/-6.2;
+// else if(val<=260&&val>236) //35cm to 40cm
+//  dist=(val-428.0)/-4.8;
+// else if(val<=236&&val>216) //40cm to 45cm
+//  dist=(val-396.0)/-4.0;
+// else if(val<=216&&val>198) //45cm to 50cm
+//  dist=(val-378.0)/-3.6;
+// else if(val<=198&&val>185) //50cm to 55cm
+//  dist=(val-328.0)/-2.6;
+// else if(val<=185&&val>173) //55cm to 60cm
+//  dist=(val-317.0)/-2.4;
+// else if(val<=173&&val>161) //60cm to 65cm
+//  dist=(val-317.0)/-2.4;
+// else if(val<=161&&val>152) //65cm to 70cm
+//  dist=(val-278.0)/-1.8;
+// else
+//  dist=70;
+// return dist;
+//}
