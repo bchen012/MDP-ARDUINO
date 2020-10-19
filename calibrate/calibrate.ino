@@ -198,19 +198,25 @@ void send_data(){
   Serial.println(s);
 
 //board size is 15*20?
+  bool capt = true;
   switch(pos[2]){
     case UP:
-      if(pos[0] == 0)Serial.println("Capture Trigger");
+      if(pos[0] == 0)capt =false;
       break;
     case RIGHT:
-      if(pos[1] == 17)Serial.println("Capture Trigger");
+      if(pos[1] == 17)capt=false;
       break;
     case DOWN:
-      if (pos[0] == 12) Serial.println("Capture Trigger");
+      if (pos[0] == 12) capt=false;
       break;
     case LEFT:
-      if(pos[1] == 0) Serial.println("Capture Trigger");
+      if(pos[1] == 0) capt=false;
+      break;
+    default:
+      break;
   }
+  if(capt)Serial.println("Capture Triggered");
+
 }
 
 void recieve_instruction(){
