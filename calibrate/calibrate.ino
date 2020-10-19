@@ -9,6 +9,11 @@
 #define sideF A5
 #define BUFFER_LENGTH 128
 
+#define UP 0
+#define RIGHT 1
+#define DOWN 2
+#define LEFT 3
+
 //505 A4 493 A5 right sensors ideal
 // 497 A0 505 A2 front sensors ideal
 DualVNH5019MotorShield md;
@@ -32,13 +37,16 @@ const double k1_L = 0.8, k2_L = -0.15,k3_L=0;
 const double k1_R = 1, k2_R = -0.15,k3_R=0;
 double error_L[] = {0,0,0}, error_R[] = {0,0,0};
 volatile unsigned int index= 0;
+
 double u_L = 0, rpm_L = 0;
 double u_R = 0, rpm_R = 0;
 int turn_time = 65, startSpeed = 200, forwardSpeed = 62;
 signed int speed_R = 0, speed_L = 0;
-double tick360L = 1678, tick360R = 1676;  
+double tick360L = 1678, tick360R = 1676;
+
 bool enable_send_data = true;
 int send_ack=0;
+signed int pos[] ={0,0,0};
 
 void Interrupt_L(void)
 {
@@ -118,6 +126,7 @@ void setup()
 
 void loop()
 {   
+  
 
   //501 494 477 469
   recieve_instruction();
@@ -187,6 +196,21 @@ void send_data(){
   Serial.println(s);
   s = "[c]Explore:"+sensorData;
   Serial.println(s);
+
+//board size is 15*20?
+  switch(pos[2]){
+    case UP:
+      if(pos[0] == 0)Serial.println("Capture Trigger");
+      break;
+    case RIGHT:
+      if(pos[1] == 17)Serial.println("Capture Trigger");
+      break;
+    case DOWN:
+      if (pos[0] == 12) Serial.println("Capture Trigger");
+      break;
+    case LEFT:
+      if(pos[1] == 0) Serial.println("Capture Trigger");
+  }
 }
 
 void recieve_instruction(){
@@ -216,6 +240,36 @@ void recieve_instruction(){
   instruction[i]='\n';
 }
 
+void updatePos(char inst,int dist = 1){
+  switch(inst){
+    case 'F':
+      switch(pos[2]) {
+        case UP:
+          pos[1]= (pos[1]+dist)%4;
+          break;
+        case RIGHT:
+          pos[0]= (pos[0]+dist)%4;
+          break;
+        case DOWN:
+          pos[1]= (pos[1]-dist)%4;
+          break;
+        case LEFT:
+          pos[0]= (pos[0]-dist)%4;
+          break;
+      default:
+          Serial.println("Error in updatePos");
+      }
+      break;
+    case 'L':
+      pos[2] = (pos[2]-1)%4;
+      break;
+    case 'R':
+      pos[2] = (pos[2]+1)%4;
+      break;
+    default:
+      break;
+  }
+}
 void execute_instructions(){
   int dist = 0;
   
@@ -229,23 +283,26 @@ void execute_instructions(){
           i++;
           dist =dist*10+(instruction[i]-'0');
         }
+//        if (!enable_send_data)
+//          Serial.println("[c]M");
         Serial.print("[b]F");
         Serial.println(dist);
-//        if (!enable_send_data)
-//          Serial.println("[c]M");
         forward(forwardSpeed, distance_to_ticks(dist*10));
+        updatePos('F',dist);
       }
       else if(instruction[i] == 'L'){
-        Serial.println("[b]L");
 //        if (!enable_send_data)
 //          Serial.println("[c]M");
+        Serial.println("[b]L");
         left_turn(60, deg_to_tick_L(90));
+        updatePos('L');
       }
       else if(instruction[i] == 'R'){
         Serial.println("[b]R");
 //        if (!enable_send_data)
 //          Serial.println("[c]M");
         right_turn(60, deg_to_tick_R(90));
+        updatePos('R');
       }
       else if( instruction[i]=='E'){
         enable_send_data = false;
