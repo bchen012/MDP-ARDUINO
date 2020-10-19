@@ -46,7 +46,7 @@ double tick360L = 1678, tick360R = 1676;
 
 bool enable_send_data = true;
 int send_ack=0;
-signed int pos[] ={0,0,0};
+unsigned int pos[] ={0,0,0};
 
 void Interrupt_L(void)
 {
@@ -199,7 +199,7 @@ void send_data(){
 
 //board size is 15*20?
   bool capt = true;
-  switch(pos[2]){
+  switch(pos[2]&0x00000003){
     case UP:
       if(pos[0] == 0)capt =false;
       break;
@@ -249,28 +249,28 @@ void recieve_instruction(){
 void updatePos(char inst,int dist = 1){
   switch(inst){
     case 'F':
-      switch(pos[2]) {
+      switch(pos[2]&0x00000003) {
         case UP:
-          pos[1]= (pos[1]+dist)%4;
+          pos[1] += dist;
           break;
         case RIGHT:
-          pos[0]= (pos[0]+dist)%4;
+          pos[0] += dist;
           break;
         case DOWN:
-          pos[1]= (pos[1]-dist)%4;
+          pos[1] -= dist;
           break;
         case LEFT:
-          pos[0]= (pos[0]-dist)%4;
+          pos[0] -=dist;
           break;
       default:
           Serial.println("Error in updatePos");
       }
       break;
     case 'L':
-      pos[2] = (pos[2]-1)%4;
+      pos[2]--;
       break;
     case 'R':
-      pos[2] = (pos[2]+1)%4;
+      pos[2]++;
       break;
     default:
       break;
